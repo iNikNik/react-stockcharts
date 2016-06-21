@@ -3,6 +3,7 @@
 import React, { PropTypes, Component } from "react";
 
 import {
+	first,
 	last,
 	isDefined,
 	isNotDefined,
@@ -35,6 +36,13 @@ function isLastItemVisible(fullData, plotData) {
 		visible = visible || last(fullData[key]) === last(plotData);
 	}
 	return visible;
+}
+
+function isDataInsertedToTheBeginning(fullData, nextFullData, showingInterval) {
+	return shallowEqual(
+		first(isDefined(showingInterval) ? nextFullData[showingInterval] : nextFullData),
+		first(isDefined(showingInterval) ? fullData[showingInterval] : fullData)
+	)
 }
 
 function setXRange(xScale, dimensions, padding, direction = 1) {
@@ -139,13 +147,42 @@ class EventHandler extends Component {
 				chartConfig,
 			};
 		} else if (dataAltered
+						&& isDataInsertedToTheBeginning(this.props.fullData, fullData, showingInterval)) {
+
+			if (process.env.NODE_ENV !== "production") {
+				console.log("DATA CHANGED - INSERTED TO THE BEGINNING");
+			}
+
+			let updatedXScale = setXRange(this.state.xScale.copy(), dimensions, padding, direction);
+			let [start, end] = this.state.xScale.domain();
+
+			let lastItem = last(isDefined(showingInterval) ? this.props.fullData[showingInterval] : this.props.fullData);
+			let nextLastItem = last(isDefined(showingInterval) ? fullData[showingInterval] : fullData);
+
+			// As indexes were increased we need to get current (old) visible data but with new indexes
+			let dx = xAccessor(nextLastItem) - xAccessor(lastItem);
+			let newStart = start + dx;
+			let newEnd = end + dx;
+
+			plotData = getDataBetween(fullData, showingInterval, xAccessor, newStart, newEnd);
+			updatedXScale.data(plotData);
+
+			let chartConfig = getChartConfigWithUpdatedYScales(getNewChartConfig(dimensions, children), plotData);
+
+			newState = {
+				xScale: updatedXScale,
+				chartConfig: chartConfig,
+				plotData: plotData
+			};
+
+		} else if (dataAltered
 				&& isLastItemVisible(this.props.fullData, this.state.plotData)) {
 
 			if (process.env.NODE_ENV !== "production") {
 				console.log("DATA CHANGED AND LAST ITEM VISIBLE");
 			}
 			// if last item was visible, then shift
-			var updatedXScale = setXRange(this.state.xScale.copy(), dimensions, padding, direction);
+			let updatedXScale = setXRange(this.state.xScale.copy(), dimensions, padding, direction);
 
 			var [start, end] = this.state.xScale.domain();
 			var l = last(isDefined(showingInterval) ? fullData[showingInterval] : fullData);
@@ -614,6 +651,18 @@ class EventHandler extends Component {
 		var { interactiveState, callbackList } = this.panHappened
 			? this.triggerCallback("panend", state, this.state.interactiveState, e)
 			: this.triggerCallback("click", state, this.state.interactiveState, e);
+
+		if (this.props.xAccessor(first(this.state.plotData)) === this.props.xAccessor(first(this.props.fullData))) {
+			let callbackObj = this.triggerCallback("loadpreviousdata", state, interactiveState, e);
+			interactiveState = callbackObj.interactiveState;
+
+			if (isDefined(callbackObj.callbackList)) {
+				callbackList = isDefined(callbackList)
+					? [...callbackList, ...callbackObj.callbackList]
+					: callbackObj.callbackList
+				;
+			}
+		}
 
 		this.clearThreeCanvas();
 		if (interactiveState !== this.state.interactive) this.clearInteractiveCanvas();
