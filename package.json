@@ -12,6 +12,7 @@
   "dependencies": {
     "d3": "^3.5.14",
     "lodash.flattendeep": "^4.1.0",
+    "lodash.isequal": "^4.2.0",
     "save-svg-as-png": "^1.0.2"
   },
   "peerDependencies": {

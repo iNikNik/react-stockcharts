@@ -1,6 +1,7 @@
 "use strict";
 
 import React, { PropTypes, Component } from "react";
+import isEqual from "lodash.isequal";
 
 import {
 	first,
@@ -39,7 +40,7 @@ function isLastItemVisible(fullData, plotData) {
 }
 
 function isDataInsertedToTheBeginning(fullData, nextFullData, showingInterval) {
-	return shallowEqual(
+	return !isEqual(
 		first(isDefined(showingInterval) ? nextFullData[showingInterval] : nextFullData),
 		first(isDefined(showingInterval) ? fullData[showingInterval] : fullData)
 	)
@@ -640,7 +641,7 @@ class EventHandler extends Component {
 	clearCanvasDrawCallbackList() {
 		this.canvasDrawCallbackList = [];
 	}
-	handlePanEnd(mousePosition, e) {
+	handlePanEnd(mousePosition, e, loadMoreDataCallback) {
 		var state = this.panHelper(mousePosition);
 		// console.log(this.canvasDrawCallbackList.map(d => d.type));
 		this.hackyWayToStopPanBeyondBounds__plotData = null;
@@ -651,18 +652,6 @@ class EventHandler extends Component {
 		var { interactiveState, callbackList } = this.panHappened
 			? this.triggerCallback("panend", state, this.state.interactiveState, e)
 			: this.triggerCallback("click", state, this.state.interactiveState, e);
-
-		if (this.props.xAccessor(first(this.state.plotData)) === this.props.xAccessor(first(this.props.fullData))) {
-			let callbackObj = this.triggerCallback("loadpreviousdata", state, interactiveState, e);
-			interactiveState = callbackObj.interactiveState;
-
-			if (isDefined(callbackObj.callbackList)) {
-				callbackList = isDefined(callbackList)
-					? [...callbackList, ...callbackObj.callbackList]
-					: callbackObj.callbackList
-				;
-			}
-		}
 
 		this.clearThreeCanvas();
 		if (interactiveState !== this.state.interactive) this.clearInteractiveCanvas();
@@ -675,6 +664,11 @@ class EventHandler extends Component {
 			panStartXScale: null,
 			interactiveState,
 		}, () => {
+			// Lets check - "is first item visible?". If so - push loadMoreDataCallback to callbackList
+			// IMPORTANT - we should do it AFTER pan have been applied
+			if (this.props.xAccessor(first(this.state.plotData)) === this.props.xAccessor(first(this.props.fullData))) {
+				callbackList = loadMoreDataCallback ? [ ...(callbackList || []), loadMoreDataCallback ] : callbackList
+			}
 			if (isDefined(callbackList)) callbackList.forEach(callback => callback());
 		});
 	}

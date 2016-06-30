@@ -121,7 +121,7 @@ class EventCapture extends Component {
 	handlePanEnd() {
 		var e = d3.event;
 
-		var { pan: panEnabled } = this.props;
+		var { pan: panEnabled, onLoadMoreData } = this.props;
 		var { deltaXY: dxdy, onPanEnd } = this.context;
 
 		var newPos = [e.pageX - dxdy[0], e.pageY - dxdy[1]];
@@ -134,7 +134,7 @@ class EventCapture extends Component {
 			d3.select(win)
 				.on(mousemove, null)
 				.on(mouseup, null);
-			onPanEnd(newPos, e);
+			onPanEnd(newPos, e, onLoadMoreData);
 		}
 		// e.preventDefault();
 	}
